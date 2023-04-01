@@ -26,4 +26,6 @@ char kernel_stack[PLAT_CPU_NUM][KERNEL_STACK_SIZE];
 void main(void *addr)
 {
         BUG("[FATAL] Should never be here!\n");
+
+        
 }
