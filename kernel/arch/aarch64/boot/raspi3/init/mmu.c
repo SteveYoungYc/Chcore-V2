@@ -96,7 +96,7 @@ void init_boot_pt(void)
         /* Step 2: map PHYSMEM_START ~ PERIPHERAL_BASE with 2MB granularity */
         for (; vaddr < KERNEL_VADDR + PERIPHERAL_BASE; vaddr += SIZE_2M) {
                 boot_ttbr1_l2[GET_L2_INDEX(vaddr)] =
-                        (vaddr) /* low mem, va = pa */
+                        (vaddr - KERNEL_VADDR) /* high mem, va = pa +  KERNEL_VADDR */
                         | UXN /* Unprivileged execute never */
                         | ACCESSED /* Set access flag */
                         | NG /* Mark as not global */
@@ -108,7 +108,7 @@ void init_boot_pt(void)
         /* Step 2: map PERIPHERAL_BASE ~ PHYSMEM_END with 2MB granularity */
         for (vaddr = KERNEL_VADDR + PERIPHERAL_BASE; vaddr < KERNEL_VADDR + PHYSMEM_END; vaddr += SIZE_2M) {
                 boot_ttbr1_l2[GET_L2_INDEX(vaddr)] =
-                        (vaddr) /* low mem, va = pa */
+                        (vaddr - KERNEL_VADDR) /* high mem, va = pa +  KERNEL_VADDR */
                         | UXN /* Unprivileged execute never */
                         | ACCESSED /* Set access flag */
                         | NG /* Mark as not global */
