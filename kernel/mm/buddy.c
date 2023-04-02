@@ -150,6 +150,8 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
          * Hint: Find a chunk that satisfies the order requirement
          * in the free lists, then split it if necessary.
          */
+        if (order >= BUDDY_MAX_ORDER)
+                return NULL;
 	struct page *page = NULL;
 	struct page *page_got = NULL;
 	struct free_list list;
