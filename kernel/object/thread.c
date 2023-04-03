@@ -108,7 +108,35 @@ static u64 load_binary(struct cap_group *cap_group, struct vmspace *vmspace,
                         seg_sz = elf->p_headers[i].p_memsz;
                         p_vaddr = elf->p_headers[i].p_vaddr;
                         /* LAB 3 TODO BEGIN */
-
+			u64 vaddr_start = ROUND_DOWN(p_vaddr, PAGE_SIZE);
+			u64 vaddr_end = ROUND_UP(p_vaddr + seg_sz, PAGE_SIZE);
+			seg_map_sz = vaddr_end - vaddr_start;
+			pmo = obj_alloc(TYPE_PMO, sizeof(*pmo));
+			if (!pmo) {
+				r = -ENOMEM;
+				goto out_free_cap;
+			}
+			pmo_init(pmo, PMO_DATA, seg_map_sz, 0);
+			pmo_cap[i] = cap_alloc(cap_group, pmo, 0);
+			if (pmo_cap[i] < 0) {
+				r = pmo_cap[i];
+				goto out_free_cap;
+			}
+			/*
+			 * Lab3: Your code here
+			 * You should copy data from the elf into the physical memory in pmo.
+			 * The physical address of a pmo can be get from pmo->start.
+			 */
+			u64 start_offset = p_vaddr - vaddr_start;
+			char *pmo_start = (char *) phys_to_virt(pmo->start) + start_offset;
+			char *seg_start = (char *) bin + elf->p_headers[i].p_offset;
+			for(u64 j = 0; j < elf->p_headers[i].p_filesz; j++) {
+			    pmo_start[j] = seg_start[j];
+			}
+			flags = PFLAGS2VMRFLAGS(elf->p_headers[i].p_flags);
+			ret = vmspace_map_range(vmspace,
+						ROUND_DOWN(p_vaddr, PAGE_SIZE),
+						seg_map_sz, flags, pmo);
                         /* LAB 3 TODO END */
                         BUG_ON(ret != 0);
                 }
