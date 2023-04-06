@@ -111,6 +111,8 @@ void main(paddr_t boot_flag)
 
         /* Should provide panic and use here */
         BUG("[FATAL] Should never be here!\n");
+
+        
 }
 
 void secondary_start(void)
