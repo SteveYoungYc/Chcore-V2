@@ -430,7 +430,9 @@ void sys_thread_exit(void)
         current_thread->thread_ctx->thread_exit_state = TE_EXITED;
 	current_thread->thread_ctx->state = TS_EXIT;
         thread_deinit(current_thread);
-	obj_put(current_thread);
+        // TODO: free thread struct, but I can't find the slot_id of this object
+        // cap_free(current_thread->cap_group, ???);
+	// obj_put(current_thread);
 	current_thread = NULL;
         /* LAB 3 TODO END */
         printk("Lab 3 hang.\n");
