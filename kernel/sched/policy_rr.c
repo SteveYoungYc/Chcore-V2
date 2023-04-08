@@ -61,7 +61,19 @@ struct thread idle_threads[PLAT_CPU_NUM];
 int rr_sched_enqueue(struct thread *thread)
 {
         /* LAB 4 TODO BEGIN */
-
+        if (thread == NULL || thread->thread_ctx == NULL
+            || thread->thread_ctx->state == TS_READY) {
+                return -1;
+        }
+        if (thread->thread_ctx->type == TYPE_IDLE) {
+                return 0;
+        }
+        u32 id = smp_get_cpu_id();
+        thread->thread_ctx->cpuid = id;
+        thread->thread_ctx->state = TS_READY;
+        list_append(&thread->ready_queue_node,
+                    &rr_ready_queue_meta[id].queue_head);
+        rr_ready_queue_meta[id].queue_len++;
         /* LAB 4 TODO END */
         return 0;
 }
@@ -75,7 +87,18 @@ int rr_sched_enqueue(struct thread *thread)
 int rr_sched_dequeue(struct thread *thread)
 {
         /* LAB 4 TODO BEGIN */
-
+        if (thread == NULL || thread->thread_ctx == NULL
+            || thread->thread_ctx->state != TS_READY
+            || thread->thread_ctx->type == TYPE_IDLE) {
+                return -1;
+        }
+        s32 id = thread->thread_ctx->cpuid;
+        if (list_empty(&rr_ready_queue_meta[id].queue_head)) {
+                return -1;
+        }
+        thread->thread_ctx->state = TS_INTER;
+        list_del(&thread->ready_queue_node);
+        rr_ready_queue_meta[id].queue_len--;
         /* LAB 4 TODO END */
         return 0;
 }
@@ -91,7 +114,15 @@ struct thread *rr_sched_choose_thread(void)
 {
         struct thread *thread = NULL;
         /* LAB 4 TODO BEGIN */
-
+        u32 id = smp_get_cpu_id();
+        if (list_empty(&rr_ready_queue_meta[id].queue_head)) {
+                thread = &idle_threads[id];
+        } else {
+                thread = list_entry(rr_ready_queue_meta[id].queue_head.next,
+                                    struct thread,
+                                    ready_queue_node);
+                rr_sched_dequeue(thread);
+        }
         /* LAB 4 TODO END */
         return thread;
 }
@@ -125,7 +156,16 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 int rr_sched(void)
 {
         /* LAB 4 TODO BEGIN */
-
+        if (current_thread != NULL
+            && current_thread->thread_ctx != NULL
+            && current_thread->thread_ctx->thread_exit_state == TE_EXITING) {
+                current_thread->thread_ctx->state = TS_EXIT;
+                current_thread->thread_ctx->thread_exit_state = TE_EXITED;
+                return 0;
+        }
+        rr_sched_enqueue(current_thread);
+        struct thread *thread = rr_sched_choose_thread();
+        switch_to_thread(thread);
         /* LAB 4 TODO END */
 
         return 0;
@@ -175,6 +215,7 @@ int rr_sched_init(void)
 
                 /* Add idle_threads to the threads list */
                 list_add(&idle_threads[i].node, &idle_cap_group->thread_list);
+                printk("idle_threads[%d]: %p\n", i, &idle_threads[i]);
         }
         kdebug("Scheduler initialized. Create %d idle threads.\n", i);
 
