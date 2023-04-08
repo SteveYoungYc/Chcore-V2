@@ -172,7 +172,8 @@ int rr_sched(void)
                         current_thread->thread_ctx->thread_exit_state = TE_EXITED;
                         return 0;
                 }
-                if (current_thread->thread_ctx->sc->budget != 0) {
+                if (current_thread->thread_ctx->type != TYPE_IDLE
+                && current_thread->thread_ctx->sc->budget != 0) {
                         return 0;
                 }
         }
