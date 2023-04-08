@@ -69,6 +69,14 @@ int rr_sched_enqueue(struct thread *thread)
                 return 0;
         }
         u32 id = smp_get_cpu_id();
+        s32 aff = thread->thread_ctx->affinity;
+	if (aff < NO_AFF || aff >= PLAT_CPU_NUM) {
+		return -1;
+	} else if (aff == NO_AFF) {
+		id = smp_get_cpu_id();
+	} else {
+		id = thread->thread_ctx->affinity;
+	}
         thread->thread_ctx->cpuid = id;
         thread->thread_ctx->state = TS_READY;
         list_append(&thread->ready_queue_node,
@@ -134,7 +142,9 @@ struct thread *rr_sched_choose_thread(void)
 static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 {
         /* LAB 4 TODO BEGIN */
-
+        if (target->thread_ctx->type != TYPE_IDLE) {
+                target->thread_ctx->sc->budget = budget;
+        }
         /* LAB 4 TODO END */
 }
 
@@ -156,15 +166,19 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 int rr_sched(void)
 {
         /* LAB 4 TODO BEGIN */
-        if (current_thread != NULL
-            && current_thread->thread_ctx != NULL
-            && current_thread->thread_ctx->thread_exit_state == TE_EXITING) {
-                current_thread->thread_ctx->state = TS_EXIT;
-                current_thread->thread_ctx->thread_exit_state = TE_EXITED;
-                return 0;
+        if (current_thread != NULL && current_thread->thread_ctx != NULL) {
+                if (current_thread->thread_ctx->thread_exit_state == TE_EXITING) {
+                        current_thread->thread_ctx->state = TS_EXIT;
+                        current_thread->thread_ctx->thread_exit_state = TE_EXITED;
+                        return 0;
+                }
+                if (current_thread->thread_ctx->sc->budget != 0) {
+                        return 0;
+                }
         }
         rr_sched_enqueue(current_thread);
         struct thread *thread = rr_sched_choose_thread();
+        rr_sched_refill_budget(thread, DEFAULT_BUDGET);
         switch_to_thread(thread);
         /* LAB 4 TODO END */
 

@@ -78,7 +78,7 @@ void main(paddr_t boot_flag)
         /* Init exception vector */
         arch_interrupt_init();
         /* LAB 4 TODO BEGIN */
-
+        timer_init();
         /* LAB 4 TODO END */
         kinfo("[ChCore] interrupt init finished\n");
 
@@ -129,8 +129,9 @@ void secondary_start(void)
         run_test();
 #endif
 
-        /* LAB 4 TODO BEGIN */
         lock_kernel();
+        /* LAB 4 TODO BEGIN */
+        timer_init();
         /* LAB 4 TODO END */
         sched();
         eret_to_thread(switch_context());
