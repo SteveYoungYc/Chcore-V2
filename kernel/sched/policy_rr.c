@@ -166,9 +166,11 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 int rr_sched(void)
 {
         /* LAB 4 TODO BEGIN */
-        if (current_thread != NULL && current_thread->thread_ctx != NULL) {
-                if (current_thread->thread_ctx->type != TYPE_IDLE
-                    && current_thread->thread_ctx->sc->budget != 0) {
+        if (current_thread != NULL && current_thread->thread_ctx != NULL 
+            && current_thread->thread_ctx->type != TYPE_IDLE) {
+                if (current_thread->thread_ctx->sc->budget > 0 
+                    && current_thread->thread_ctx->state != TS_WAITING 
+                    && current_thread->thread_ctx->thread_exit_state != TE_EXITING) {
                         return 0;
                 }
 
