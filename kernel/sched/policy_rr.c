@@ -167,17 +167,21 @@ int rr_sched(void)
 {
         /* LAB 4 TODO BEGIN */
         if (current_thread != NULL && current_thread->thread_ctx != NULL) {
+                if (current_thread->thread_ctx->type != TYPE_IDLE
+                    && current_thread->thread_ctx->sc->budget != 0) {
+                        return 0;
+                }
+
                 if (current_thread->thread_ctx->thread_exit_state == TE_EXITING) {
                         current_thread->thread_ctx->state = TS_EXIT;
                         current_thread->thread_ctx->thread_exit_state = TE_EXITED;
-                        return 0;
                 }
-                if (current_thread->thread_ctx->type != TYPE_IDLE
-                && current_thread->thread_ctx->sc->budget != 0) {
-                        return 0;
+
+                if (current_thread->thread_ctx->state != TS_WAITING
+                    && current_thread->thread_ctx->state != TS_EXIT) {
+                        rr_sched_enqueue(current_thread);
                 }
         }
-        rr_sched_enqueue(current_thread);
         struct thread *thread = rr_sched_choose_thread();
         rr_sched_refill_budget(thread, DEFAULT_BUDGET);
         switch_to_thread(thread);
@@ -230,7 +234,6 @@ int rr_sched_init(void)
 
                 /* Add idle_threads to the threads list */
                 list_add(&idle_threads[i].node, &idle_cap_group->thread_list);
-                printk("idle_threads[%d]: %p\n", i, &idle_threads[i]);
         }
         kdebug("Scheduler initialized. Create %d idle threads.\n", i);
 
