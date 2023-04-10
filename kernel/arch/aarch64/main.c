@@ -78,7 +78,7 @@ void main(paddr_t boot_flag)
         /* Init exception vector */
         arch_interrupt_init();
         /* LAB 4 TODO BEGIN */
-
+        timer_init();
         /* LAB 4 TODO END */
         kinfo("[ChCore] interrupt init finished\n");
 
@@ -111,6 +111,8 @@ void main(paddr_t boot_flag)
 
         /* Should provide panic and use here */
         BUG("[FATAL] Should never be here!\n");
+
+        
 }
 
 void secondary_start(void)
@@ -121,17 +123,16 @@ void secondary_start(void)
         pmu_init();
 
         /* LAB 4 TODO BEGIN: Set the cpu_status */
-
+        cpu_status[cpuid] = cpu_run;
         /* LAB 4 TODO END */
 #ifdef CHCORE_KERNEL_TEST
         run_test();
 #endif
 
-        /* LAB 4 TODO BEGIN */
-
-        /* LAB 4 TODO END */
-
         lock_kernel();
+        /* LAB 4 TODO BEGIN */
+        timer_init();
+        /* LAB 4 TODO END */
         sched();
         eret_to_thread(switch_context());
 }
