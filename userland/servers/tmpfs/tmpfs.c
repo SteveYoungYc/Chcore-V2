@@ -135,7 +135,8 @@ struct dentry *new_dent(struct inode *inode, const char *name,
 
 	return dent;
 }
-
+struct dentry *tfs_lookup(struct inode *dir, const char *name,
+				 size_t len);
 // this function create a file (directory if `mkdir` == true, otherwise regular
 // file) and its size is `len`. You should create an inode and corresponding 
 // dentry, then add dentey to `dir`'s htable by `htable_add`.
@@ -152,7 +153,22 @@ static int tfs_mknod(struct inode *dir, const char *name, size_t len, int mkdir)
 		return -ENOENT;
 	}
 	/* LAB 5 TODO BEGIN */
+	if (dir == NULL) {
+		dir = tmpfs_root;
+	}
 
+	if (mkdir) {
+		inode = new_dir();
+	} else {
+		inode = new_reg();
+	}
+	printf("inode: %x\n", inode);
+	dent = new_dent(inode, name, strlen(name));
+	htable_add(&dir->dentries, hash_string(&dent->name), &dent->node);
+	inode->size = len;
+
+	struct inode *tmp = tfs_lookup(dir, name, strlen(name));
+	printf("test tfs_mknod: %x\n", tmp);
 	/* LAB 5 TODO END */
 
 	return 0;
@@ -200,7 +216,7 @@ int tfs_namex(struct inode **dirat, const char **name, int mkdir_p)
 	BUG_ON(name == NULL);
 	BUG_ON(*name == NULL);
 
-	char buff[MAX_FILENAME_LEN + 1];
+	char *buff;
 	int i;
 	struct dentry *dent;
 	int err;
@@ -222,7 +238,34 @@ int tfs_namex(struct inode **dirat, const char **name, int mkdir_p)
 	// `tfs_lookup` and `tfs_mkdir` are useful here
 
 	/* LAB 5 TODO BEGIN */
+	buff = *name;
+	printf("buff: %s, len: %d\n", buff, strlen(buff));
 
+	for (i = 0; i < strlen(buff) + 1;) {
+		if (buff[i] != '/' && buff[i] != '\0') {
+			++i;
+			continue;
+		}
+		printf("name: %s, len: %d\n", *name, buff + i - *name);
+		dent = tfs_lookup(*dirat, *name, buff + i - *name);
+		if (dent == NULL) {
+			if (mkdir_p) {
+				err = tfs_mkdir(*dirat, *name, buff + i - *name);
+				if (err != 0)
+					return err;
+			} else {
+				return -1;
+			}
+		}
+		printf("dent->name: %s\n", dent->name.str);
+		*dirat = dent->inode;
+		*name = buff + i;
+		while (**name && **name == '/') {
+			++(*name);
+			++i;
+		}
+	}
+	
 	/* LAB 5 TODO END */
 
 	/* we will never reach here? */

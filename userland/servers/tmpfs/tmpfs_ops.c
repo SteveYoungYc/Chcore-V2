@@ -119,7 +119,13 @@ int tmpfs_mkdir(const char *path, mode_t mode)
 	BUG_ON(*path != '/');
 
 	/* LAB 5 TODO BEGIN */
-
+	err = tfs_namex(&dirat, &path, 1);
+	if (err == 0) {
+		printf("Fail:Duplicate name!\n");
+		return -1;
+	}
+	printf("[create]name:%s, len:%d\n", path, strlen(path));
+	err = tfs_mkdir(dirat, path, strlen(path));
 	/* LAB 5 TODO END */
 	return err;
 }
