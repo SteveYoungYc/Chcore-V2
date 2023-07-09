@@ -17,6 +17,7 @@
 #include <chcore/assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <libc/sys/stat.h>
 #include "../fs_base/fs_wrapper_defs.h"
 #include "../fs_base/fs_vnode.h"
 #include "../fs_base/falloc.h"
@@ -38,6 +39,7 @@ int tmpfs_open(char *path, int flags, int mode, unsigned long *vnode_id, size_t 
 		*vnode_type = inode->type == FS_REG ? FS_NODE_REG : FS_NODE_DIR;
 		*vnode_size = inode->size;
 		*vnode_private = inode;
+		get_inode(inode);
 		ret = 0;
 	}
 	return ret;
@@ -64,7 +66,9 @@ int tmpfs_write(void *operator, unsigned long offset, size_t size, const char *b
 
 int tmpfs_close(void *operator, bool is_dir)
 {
-	return 0;
+	int ret = 0;
+	ret = put_inode((struct inode *)operator);
+	return ret;
 }
 
 int fs_creat(const char *path)
@@ -77,7 +81,10 @@ int fs_creat(const char *path)
 	BUG_ON(*path != '/');
 
 	/* LAB 5 TODO BEGIN */
-
+	err = tfs_namex(&dirat, &leaf, 0); // leaf = absolute path makes dirat automatedly be root inode
+	if (err < 0 && err != -ENOENT)
+		return err;
+	err = tfs_creat(dirat, leaf, strlen(leaf));
 	/* LAB 5 TODO END */
 	return 0;
 
@@ -99,7 +106,10 @@ int tmpfs_unlink(const char *path, int flags)
 	BUG_ON(*path != '/');
 
 	/* LAB 5 TODO BEGIN */
-
+	err = tfs_namex(&dirat, &leaf, 0);
+	if (err < 0)
+		return err;
+	err = tfs_remove(dirat, leaf, strlen(leaf));
 	/* LAB 5 TODO END */
 	return err;
 }
@@ -119,13 +129,10 @@ int tmpfs_mkdir(const char *path, mode_t mode)
 	BUG_ON(*path != '/');
 
 	/* LAB 5 TODO BEGIN */
-	err = tfs_namex(&dirat, &path, 1);
-	if (err == 0) {
-		printf("Fail:Duplicate name!\n");
-		return -1;
-	}
-	printf("[create]name:%s, len:%d\n", path, strlen(path));
-	err = tfs_mkdir(dirat, path, strlen(path));
+	err = tfs_namex(&dirat, &leaf, 0); // leaf = absolute path makes dirat automatedly be root inode
+	if (err < 0 && err != -ENOENT)
+		return err;
+	err = tfs_mkdir(dirat, leaf, strlen(leaf));
 	/* LAB 5 TODO END */
 	return err;
 }

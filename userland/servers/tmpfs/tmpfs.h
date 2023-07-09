@@ -56,6 +56,18 @@ int tfs_load_image(const char *start);
 
 int del_inode(struct inode *inode);
 
+static inline struct inode *get_inode(struct inode *i)
+{
+	i->refcnt++;
+	return i;
+}
+static inline int put_inode(struct inode *i) {
+	i->refcnt--;
+	chcore_assert(i->refcnt >= 0);
+	if (!i->refcnt)
+		return del_inode(i);
+	return 0;
+}
 
 
 

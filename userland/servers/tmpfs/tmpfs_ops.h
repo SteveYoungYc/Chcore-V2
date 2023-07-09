@@ -17,6 +17,7 @@
 #include <chcore/assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <libc/sys/stat.h>
 #include "../fs_base/fs_wrapper_defs.h"
 #include "../fs_base/fs_vnode.h"
 

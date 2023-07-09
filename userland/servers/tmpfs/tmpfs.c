@@ -22,6 +22,9 @@
 #include "tmpfs.h"
 #include "tmpfs_ops.h"
 
+#define ROUND_UP(x, n)     (((x) + (n)-1) & ~((n)-1))
+#define ROUND_DOWN(x, n)   ((x) & ~((n)-1))
+
 struct inode *tmpfs_root = NULL;
 struct dentry *tmpfs_root_dent = NULL;
 struct id_manager fidman;
@@ -29,6 +32,9 @@ struct fid_record fid_records[MAX_NR_FID_RECORDS];
 struct server_entry *server_entrys[MAX_SERVER_ENTRY_NUM];
 struct list_head fs_vnode_list;
 bool mounted;
+
+/* previous definition of some function */
+struct dentry *tfs_lookup(struct inode *dir, const char *name, size_t len);
 
 /*
  * Helper functions to calucate hash value of string
@@ -135,8 +141,7 @@ struct dentry *new_dent(struct inode *inode, const char *name,
 
 	return dent;
 }
-struct dentry *tfs_lookup(struct inode *dir, const char *name,
-				 size_t len);
+
 // this function create a file (directory if `mkdir` == true, otherwise regular
 // file) and its size is `len`. You should create an inode and corresponding 
 // dentry, then add dentey to `dir`'s htable by `htable_add`.
@@ -153,22 +158,22 @@ static int tfs_mknod(struct inode *dir, const char *name, size_t len, int mkdir)
 		return -ENOENT;
 	}
 	/* LAB 5 TODO BEGIN */
-	if (dir == NULL) {
-		dir = tmpfs_root;
-	}
+	if (tfs_lookup(dir, name, len) != NULL)
+		return -EEXIST;
+	/* init inode* */
+	inode = mkdir ? new_dir() : new_reg();
+	if (IS_ERR(inode))
+		return -ENOMEM;
+	/* init dent* using inode and other args */
+	dent = new_dent(inode, name, len);
+	if (IS_ERR(dent)) {
+		free(inode);
+		return -ENOMEM;
+	};
+	/* add to htable */
+	init_hlist_node(&dent->node);
+	htable_add(&(dir->dentries), dent->name.hash, &dent->node);
 
-	if (mkdir) {
-		inode = new_dir();
-	} else {
-		inode = new_reg();
-	}
-	printf("inode: %x\n", inode);
-	dent = new_dent(inode, name, strlen(name));
-	htable_add(&dir->dentries, hash_string(&dent->name), &dent->node);
-	inode->size = len;
-
-	struct inode *tmp = tfs_lookup(dir, name, strlen(name));
-	printf("test tfs_mknod: %x\n", tmp);
 	/* LAB 5 TODO END */
 
 	return 0;
@@ -216,7 +221,7 @@ int tfs_namex(struct inode **dirat, const char **name, int mkdir_p)
 	BUG_ON(name == NULL);
 	BUG_ON(*name == NULL);
 
-	char *buff;
+	char buff[MAX_FILENAME_LEN + 1];
 	int i;
 	struct dentry *dent;
 	int err;
@@ -238,34 +243,45 @@ int tfs_namex(struct inode **dirat, const char **name, int mkdir_p)
 	// `tfs_lookup` and `tfs_mkdir` are useful here
 
 	/* LAB 5 TODO BEGIN */
-	buff = *name;
-	printf("buff: %s, len: %d\n", buff, strlen(buff));
-
-	for (i = 0; i < strlen(buff) + 1;) {
-		if (buff[i] != '/' && buff[i] != '\0') {
-			++i;
-			continue;
-		}
-		printf("name: %s, len: %d\n", *name, buff + i - *name);
-		dent = tfs_lookup(*dirat, *name, buff + i - *name);
-		if (dent == NULL) {
-			if (mkdir_p) {
-				err = tfs_mkdir(*dirat, *name, buff + i - *name);
-				if (err != 0)
-					return err;
-			} else {
-				return -1;
-			}
-		}
-		printf("dent->name: %s\n", dent->name.str);
+	/* extract first segment of name */
+	for (i = 0; i < MAX_FILENAME_LEN; i++) {
+		if (!(*name)[i] || (*name)[i] == '/') {
+			buff[i] = '\0';
+			break;
+		};
+		buff[i] = (*name)[i];
+	};
+	/* get dentry under parent dir "dirat" */
+	dent = tfs_lookup(*dirat, buff, i);
+	if (!(*name)[i]) { // at the and, *name = filename, we should check whether file exists finally
+		return dent ? 0 : -ENOENT;
+	};
+	if (!dent) {	// not exist, create or quit
+		if (mkdir_p) {
+			err = tfs_mkdir(*dirat, buff, i);
+			if (err < 0)
+				return err;
+			dent = tfs_lookup(*dirat, buff, i);
+		} else {
+			return -ENOENT;
+		};
+	};
+	/* set name and recursion */
+	(*name) += i;
+	if (**name) { // name still not to the end
 		*dirat = dent->inode;
-		*name = buff + i;
-		while (**name && **name == '/') {
-			++(*name);
-			++i;
-		}
-	}
-	
+		while ((**name) == '/') {
+			(*name)++;
+		};
+		if (**name) { // if a child name exists, recursion
+			return tfs_namex(dirat, name, mkdir_p);
+		} else { // name == '\0', whichi means origin name endsup with '/'
+			return 0;
+		};
+	};
+
+	if (!**name)
+		return -EINVAL;
 	/* LAB 5 TODO END */
 
 	/* we will never reach here? */
@@ -343,9 +359,33 @@ ssize_t tfs_file_write(struct inode * inode, off_t offset, const char *data,
 	void *page;
 
 	/* LAB 5 TODO BEGIN */
-
+	u64 origin_total_page_num = ROUND_UP(inode->size, PAGE_SIZE) / PAGE_SIZE;
+	size_t cur_to_write;
+	for (to_write = size; to_write > 0; ) {
+		page_no = ROUND_DOWN(cur_off, PAGE_SIZE) / PAGE_SIZE;
+		if (origin_total_page_num == 0 || page_no >= origin_total_page_num) { // create a new page
+			page = malloc(PAGE_SIZE);
+			if (!page) 
+				goto fail;
+			if (radix_add(&inode->data, page_no * PAGE_SIZE, page) < 0) //radix tree key is offset(interger)
+				goto fail;
+		};
+		page = radix_get(&inode->data, page_no * PAGE_SIZE);
+		if (!page)
+			goto fail;
+		page_off = cur_off % PAGE_SIZE;
+		cur_to_write = MIN(PAGE_SIZE - page_off, to_write);
+		/* copy data to memory */
+		memcpy((char*) page + page_off, data, cur_to_write);
+		/* update variables in pne loop */
+		to_write -= cur_to_write;
+		cur_off += cur_to_write;
+		data += cur_to_write;
+	};
+	if (inode->size < cur_off)
+		inode->size = cur_off;
 	/* LAB 5 TODO END */
-
+fail:
 	return cur_off - offset;
 }
 
@@ -365,9 +405,24 @@ ssize_t tfs_file_read(struct inode * inode, off_t offset, char *buff,
 	void *page;
 
 	/* LAB 5 TODO BEGIN */
-
+	size_t cur_to_read;
+	to_read = MIN(inode->size - offset, size); // caution: read out of the file
+	while (to_read > 0) {
+		page_no = ROUND_DOWN(offset, PAGE_SIZE) / PAGE_SIZE;
+		page = radix_get(&inode->data, page_no * PAGE_SIZE);
+		if (!page)
+			goto fail;
+		page_off = cur_off % PAGE_SIZE;
+		cur_to_read = MIN(PAGE_SIZE - page_off, to_read);
+		/* copy data to buff */
+		memcpy(buff, (char*) page + page_off, cur_to_read);
+		/* update variables in one loop */
+		to_read -= cur_to_read;
+		cur_off += cur_to_read;
+		buff += cur_to_read;
+	};
 	/* LAB 5 TODO END */
-
+fail:
 	return cur_off - offset;
 }
 
@@ -390,9 +445,37 @@ int tfs_load_image(const char *start)
 	cpio_extract(start, "/");
 
 	for (f = g_files.head.next; f; f = f->next) {
-	/* LAB 5 TODO BEGIN */
-
-	/* LAB 5 TODO END */
+		/* LAB 5 TODO BEGIN */
+		dirat = tmpfs_root;
+		leaf = f->name;
+		err = tfs_namex(&dirat, &leaf, 0);
+		if (err < 0 && err != -ENOENT)
+			return err;
+		int f_type = f->header.c_mode & CPIO_FT_MASK;
+		if (err == -ENOENT) {
+			switch (f_type)
+			{
+			case CPIO_REG:
+				err = tfs_creat(dirat, leaf, strlen(leaf));
+				break;
+			case CPIO_DIR:
+				err = tfs_mkdir(dirat, leaf, strlen(leaf));
+				break;
+			default:
+				err = -EPFNOSUPPORT;
+				break;
+			};
+			if (err < 0)
+				return err;
+		};
+		dent = tfs_lookup(dirat, leaf, strlen(leaf));
+		if (f_type == CPIO_REG) {
+			err = tfs_file_write(dent->inode, 0, f->data, f->header.c_filesize);
+			BUG_ON(err != f->header.c_filesize);
+			if (err < 0)
+				return err;
+		};
+		/* LAB 5 TODO END */
 	}
 
 	return 0;
