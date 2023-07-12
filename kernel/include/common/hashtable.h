@@ -14,6 +14,7 @@
 
 #include <common/types.h>
 #include <common/list.h>
+#include <common/errno.h>
 #include <mm/kmalloc.h>
 
 struct htable {
