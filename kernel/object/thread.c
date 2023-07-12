@@ -27,6 +27,8 @@
 
 #include "thread_env.h"
 
+int pmo_init(struct pmobject *pmo, pmo_type_t type, size_t len, paddr_t paddr);
+
 static int thread_init(struct thread *thread, struct cap_group *cap_group,
                        u64 stack, u64 pc, u32 prio, u32 type, s32 aff)
 {
