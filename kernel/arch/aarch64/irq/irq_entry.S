@@ -147,7 +147,7 @@ EXPORT(el1_vector)
  * sync_el0 to handle sync_el1h (e.g., page fault during copy_to_user and fpu).
  */
 
-irq_el1h:
+irq_el1h: // TODO
     /* Simply reusing exception_enter/exit is OK. */
 	exception_enter
 	mov	x0, IRQ_EL1h
