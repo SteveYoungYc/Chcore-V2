@@ -176,6 +176,35 @@ sync_el1h:
 
 sync_el0_64:
 	/* Since we cannot touch x0-x7, we need some extra work here */
+	sub	sp, sp, #16 * 8
+	stp	x0, x1, [sp, #16 * 0]
+	stp	x2, x3, [sp, #16 * 1]
+	stp	x4, x5, [sp, #16 * 2]
+	stp	x6, x7, [sp, #16 * 3]
+	stp	x8, x9, [sp, #16 * 4]
+	stp	x10, x11, [sp, #16 * 5]
+	stp	x12, x13, [sp, #16 * 6]
+	stp	x14, x15, [sp, #16 * 7]
+	
+	/* LAB 4 TODO BEGIN */
+    // 读取 cntpct_el0 寄存器的值
+    mrs x0, cntpct_el0
+
+    // 将寄存器的值存储到 timestamp_enter 变量中
+    ldr x1, =timestamp_enter
+    str x0, [x1]
+	/* LAB 4 TODO END */
+
+	ldp	x0, x1, [sp, #16 * 0]
+	ldp	x2, x3, [sp, #16 * 1]
+	ldp	x4, x5, [sp, #16 * 2]
+	ldp	x6, x7, [sp, #16 * 3]
+	ldp	x8, x9, [sp, #16 * 4]
+	ldp	x10, x11, [sp, #16 * 5]
+	ldp	x12, x13, [sp, #16 * 6]
+	ldp	x14, x15, [sp, #16 * 7]
+	add	sp, sp, #16 * 8
+
 	exception_enter
 	mrs	x25, esr_el1
 	lsr	x24, x25, #ESR_EL1_EC_SHIFT
@@ -246,6 +275,37 @@ error_el0_32:
 BEGIN_FUNC(__eret_to_thread)
 	mov	sp, x0
 	dmb ish
+	
+	sub	sp, sp, #16 * 8
+	stp	x0, x1, [sp, #16 * 0]
+	stp	x2, x3, [sp, #16 * 1]
+	stp	x4, x5, [sp, #16 * 2]
+	stp	x6, x7, [sp, #16 * 3]
+	stp	x8, x9, [sp, #16 * 4]
+	stp	x10, x11, [sp, #16 * 5]
+	stp	x12, x13, [sp, #16 * 6]
+	stp	x14, x15, [sp, #16 * 7]
+	
+	/* LAB 4 TODO BEGIN */
+    // 读取 cntpct_el0 寄存器的值
+    mrs x0, cntpct_el0
+
+    // 将寄存器的值存储到 timestamp_enter 变量中
+    ldr x1, =timestamp_exit
+    str x0, [x1]
+	bl exit
+	/* LAB 4 TODO END */
+
+	ldp	x0, x1, [sp, #16 * 0]
+	ldp	x2, x3, [sp, #16 * 1]
+	ldp	x4, x5, [sp, #16 * 2]
+	ldp	x6, x7, [sp, #16 * 3]
+	ldp	x8, x9, [sp, #16 * 4]
+	ldp	x10, x11, [sp, #16 * 5]
+	ldp	x12, x13, [sp, #16 * 6]
+	ldp	x14, x15, [sp, #16 * 7]
+	add	sp, sp, #16 * 8
+
 	bl unlock_kernel
 	exception_exit
 END_FUNC(__eret_to_thread)

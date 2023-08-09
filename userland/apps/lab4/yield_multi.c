@@ -26,14 +26,11 @@ void *thread_routine(void *arg)
 {
         u64 thread_id = (u64)arg;
 
-        while (start_flags[thread_id] == 0)
-                ;
-        __chcore_sys_yield();
-        printf("Hello, I am thread %u on cpu %u\n",
-               thread_id,
-               __chcore_sys_get_cpu_id());
-
-        start_flags[(thread_id + 1) % THREAD_NUM] = 1;
+        while (1) {
+                // if (thread_id == 0)
+                //         printf("thread%u\n", thread_id);
+                __chcore_sys_yield();
+        }
         return 0;
 }
 

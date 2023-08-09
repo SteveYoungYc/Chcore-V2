@@ -104,3 +104,7 @@ u64 plat_get_current_tick(void)
         asm volatile("mrs %0, cntpct_el0" : "=r"(cur_cnt));
         return cur_cnt;
 }
+
+u64 plat_tick_to_time(u64 tick) {
+        return tick * NS_IN_US / tick_per_us;
+}

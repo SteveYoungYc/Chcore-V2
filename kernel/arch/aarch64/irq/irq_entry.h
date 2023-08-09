@@ -39,4 +39,7 @@ void enable_irq(void);
 void disable_irq(void);
 /* fault handlers */
 void do_page_fault(u64 esr, u64 fault_addr);
+
+extern unsigned long long timestamp_enter;
+extern unsigned long long timestamp_exit;
 #endif /* __ASM__ */

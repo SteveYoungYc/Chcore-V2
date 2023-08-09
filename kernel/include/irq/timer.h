@@ -34,6 +34,7 @@ void plat_handle_timer_irq(u64 tick_delta);
 
 u64 plat_get_mono_time(void);
 u64 plat_get_current_tick(void);
+u64 plat_tick_to_time(u64 tick);
 
 /* Syscalls */
 int sys_clock_gettime(clockid_t clock, struct timespec *ts);
